@@ -97,81 +97,79 @@ class _Range:
 			== 0
 		)
 
-	def _thisStartsAfterThatStarts(
-		thisRange: IUIAutomationTextRangeT, thatRange: IUIAutomationTextRangeT
-	) -> bool:
+	def _thisStartsAfterThatStarts(this: IUIAutomationTextRangeT, that: IUIAutomationTextRangeT) -> bool:
 		return (
-			thisRange.CompareEndpoints(
+			this.CompareEndpoints(
 				UIAHandler.TextPatternRangeEndpoint_Start,
-				thatRange,
+				that,
 				UIAHandler.TextPatternRangeEndpoint_Start,
 			)
 			> 0
 		)
 
-	def _thisStartsBeforeThatEnds(thisRange, thatRange) -> bool:
+	def _thisStartsBeforeThatEnds(this, that) -> bool:
 		return (
-			thisRange.CompareEndpoints(
+			this.CompareEndpoints(
 				UIAHandler.TextPatternRangeEndpoint_Start,
-				thatRange,
+				that,
 				UIAHandler.TextPatternRangeEndpoint_End,
 			)
 			< 0
 		)
 
-	def _thisEndsBeforeThatStarts(thisRange, thatRange) -> bool:
+	def _thisEndsBeforeThatStarts(this, that) -> bool:
 		return (
-			thisRange.CompareEndpoints(
+			this.CompareEndpoints(
 				UIAHandler.TextPatternRangeEndpoint_End,
-				thatRange,
+				that,
 				UIAHandler.TextPatternRangeEndpoint_Start,
 			)
 			<= 0
 		)
 
-	def _thisEndsBeforeThatEnds(thisRange, thatRange) -> bool:
+	def _thisEndsBeforeThatEnds(this, that) -> bool:
 		return (
-			thisRange.CompareEndpoints(
+			this.CompareEndpoints(
 				UIAHandler.TextPatternRangeEndpoint_End,
-				thatRange,
+				that,
 				UIAHandler.TextPatternRangeEndpoint_End,
 			)
 			< 0
 		)
 
-	def _makeThisStartWhereThatStarts(thisRange, thatRange):
-		thisRange.MoveEndpointByRange(
+	def _makeThisStartWhereThatStarts(this, that):
+		this.MoveEndpointByRange(
 			UIAHandler.TextPatternRangeEndpoint_Start,
-			thatRange,
-			UIAHandler.TextPatternRangeEndpoint_Start,
-		)
-
-	def _makeThisStartWhereThatEnds(thisRange, thatRange):
-		thisRange.MoveEndpointByRange(
-			UIAHandler.TextPatternRangeEndpoint_Start,
-			thatRange,
-			UIAHandler.TextPatternRangeEndpoint_End,
-		)
-
-	def _makeThisEndWhereThatStarts(thisRange, thatRange):
-		thisRange.MoveEndpointByRange(
-			UIAHandler.TextPatternRangeEndpoint_End,
-			thatRange,
+			that,
 			UIAHandler.TextPatternRangeEndpoint_Start,
 		)
 
-	def _makeThisEndWhereThatEnds(thisRange, thatRange):
-		thisRange.MoveEndpointByRange(
+	def _makeThisStartWhereThatEnds(this, that):
+		this.MoveEndpointByRange(
+			UIAHandler.TextPatternRangeEndpoint_Start,
+			that,
 			UIAHandler.TextPatternRangeEndpoint_End,
-			thatRange,
+		)
+
+	def _makeThisEndWhereThatStarts(this, that):
+		this.MoveEndpointByRange(
+			UIAHandler.TextPatternRangeEndpoint_End,
+			that,
+			UIAHandler.TextPatternRangeEndpoint_Start,
+		)
+
+	def _makeThisEndWhereThatEnds(this, that):
+		this.MoveEndpointByRange(
+			UIAHandler.TextPatternRangeEndpoint_End,
+			that,
 			UIAHandler.TextPatternRangeEndpoint_End,
 		)
 
 	def _collapse(range, end: bool = False):
 		if end:
-			_makeThisStartWhereThatEnds(range, range)
+			_Range._makeThisStartWhereThatEnds(range, range)
 		else:
-			_makeThisEndWhereThatStarts(range, range)
+			_Range._makeThisEndWhereThatStarts(range, range)
 
 
 class UIATextInfo(textInfos.TextInfo):
@@ -246,11 +244,11 @@ class UIATextInfo(textInfos.TextInfo):
 		tempRange = self._rangeObj.clone()
 		documentRange = self.obj.UIATextPattern.documentRange
 		if reverse:
-			_makeThisStartWhereThatStarts(tempRange, documentRange)
+			_Range._makeThisStartWhereThatStarts(tempRange, documentRange)
 		else:
 			if tempRange.move(UIAHandler.TextUnit_Character, 1) == 0:
 				return False
-			_makeThisEndWhereThatEnds(tempRange, documentRange)
+			_Range._makeThisEndWhereThatEnds(tempRange, documentRange)
 		try:
 			range = tempRange.findText(text, reverse, not caseSensitive)
 		except COMError:
