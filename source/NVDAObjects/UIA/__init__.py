@@ -888,19 +888,13 @@ class UIATextInfo(textInfos.TextInfo):
 				if debug:
 					log.debug("Child at or past end of textRange. Breaking")
 				break
-			clippedEnd = False
-			lastChildEndDelta = childRange.CompareEndpoints(
-				UIAHandler.TextPatternRangeEndpoint_End,
-				textRange,
-				UIAHandler.TextPatternRangeEndpoint_End,
-			)
-			if lastChildEndDelta > 0:
+			clippedEnd = self._thisTextRangeEndsBeforeThatTextRangeEnds(textRange, childRange)
+			if clippedEnd:
 				if debug:
 					log.debug(
-						"textRange ended part way through the child. Crop end of childRange to fit",
+						"textRange ended part way through the child. Cropping end of child range to fit",
 					)
 				self._makeThisTextRangeEndWhereThatTextRangeEnds(childRange, textRange)
-				clippedEnd = True
 			clippedStart = False
 			childStartDelta = childRange.CompareEndpoints(
 				UIAHandler.TextPatternRangeEndpoint_Start,
@@ -917,7 +911,7 @@ class UIATextInfo(textInfos.TextInfo):
 			elif childStartDelta < 0:
 				if debug:
 					log.debug(
-						"textRange started part way through child. " "Cropping Start of child range to fit",
+						"textRange started part way through child. Cropping start of child range to fit",
 					)
 				self._makeThisTextRangeStartWhereThatTextRangeEnds(childRange, tempRange)
 				clippedStart = True
