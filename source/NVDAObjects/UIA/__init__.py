@@ -154,29 +154,17 @@ class UIATextInfo(textInfos.TextInfo):
 		tempRange = self._rangeObj.clone()
 		documentRange = self.obj.UIATextPattern.documentRange
 		if reverse:
-			tempRange.MoveEndpointByRange(
-				UIAHandler.TextPatternRangeEndpoint_Start,
-				documentRange,
-				UIAHandler.TextPatternRangeEndpoint_Start,
-			)
+			self._makeThisTextRangeStartWhereThatTextRangeStarts(tempRange, documentRange)
 		else:
 			if tempRange.move(UIAHandler.TextUnit_Character, 1) == 0:
 				return False
-			tempRange.MoveEndpointByRange(
-				UIAHandler.TextPatternRangeEndpoint_End,
-				documentRange,
-				UIAHandler.TextPatternRangeEndpoint_End,
-			)
+			self._makeThisTextRangeEndWhereThatTextRangeEnds(tempRange, documentRange)
 		try:
 			r = tempRange.findText(text, reverse, not caseSensitive)
 		except COMError:
 			r = None
 		if r:
-			r.MoveEndpointByRange(
-				UIAHandler.TextPatternRangeEndpoint_End,
-				r,
-				UIAHandler.TextPatternRangeEndpoint_Start,
-			)
+			self._makeThisTextRangeEndWhereThatTextRangeStarts(r, r)
 			self._rangeObj = r
 			return True
 		return False
@@ -776,6 +764,34 @@ class UIATextInfo(textInfos.TextInfo):
 			) < 0
 		)
 
+	def _makeThisTextRangeStartWhereThatTextRangeStarts(self, thisRange, thatRange):
+		thisRange.MoveEndpointByRange(
+			UIAHandler.TextPatternRangeEndpoint_Start,
+			thatRange,
+			UIAHandler.TextPatternRangeEndpoint_Start,
+		)	
+
+	def _makeThisTextRangeStartWhereThatTextRangeEnds(self, thisRange, thatRange):
+		thisRange.MoveEndpointByRange(
+			UIAHandler.TextPatternRangeEndpoint_Start,
+			thatRange,
+			UIAHandler.TextPatternRangeEndpoint_End,
+		)	
+
+	def _makeThisTextRangeEndWhereThatTextRangeStarts(self, thisRange, thatRange):
+		thisRange.MoveEndpointByRange(
+			UIAHandler.TextPatternRangeEndpoint_End,
+			thatRange,
+			UIAHandler.TextPatternRangeEndpoint_Start,
+		)
+
+	def _makeThisTextRangeEndWhereThatTextRangeEnds(self, thisRange, thatRange):
+		thisRange.MoveEndpointByRange(
+			UIAHandler.TextPatternRangeEndpoint_End,
+			thatRange,
+			UIAHandler.TextPatternRangeEndpoint_End,
+		)
+
 	def _walkAncestors(self, textRange, rootElement, _rootElementClipped, debug) -> List:
 		try:
 			parentElement = getEnclosingElementWithCacheFromUIATextRange(
@@ -825,11 +841,7 @@ class UIATextInfo(textInfos.TextInfo):
 		"""
 
 		tempRange = textRange.clone()
-		tempRange.MoveEndpointByRange(
-			UIAHandler.TextPatternRangeEndpoint_End,
-			tempRange,
-			UIAHandler.TextPatternRangeEndpoint_Start,
-		)
+		self._makeThisTextRangeEndWhereThatTextRangeStarts(tempRange, tempRange)
 		for index in range(childElements.length):
 			childElement = childElements.getElement(index)
 			if not childElement or UIAHandler.handler.clientObject.compareElements(
@@ -876,11 +888,7 @@ class UIATextInfo(textInfos.TextInfo):
 					log.debug(
 						"textRange ended part way through the child. Crop end of childRange to fit",
 					)
-				childRange.MoveEndpointByRange(
-					UIAHandler.TextPatternRangeEndpoint_End,
-					textRange,
-					UIAHandler.TextPatternRangeEndpoint_End,
-				)
+				self._makeThisTextRangeEndWhereThatTextRangeEnds(childRange, textRange)
 				clippedEnd = True
 			clippedStart = False
 			childStartDelta = childRange.CompareEndpoints(
@@ -890,11 +898,7 @@ class UIATextInfo(textInfos.TextInfo):
 			)
 			if childStartDelta > 0:
 				# plain text before this child
-				tempRange.MoveEndpointByRange(
-					UIAHandler.TextPatternRangeEndpoint_End,
-					childRange,
-					UIAHandler.TextPatternRangeEndpoint_Start,
-				)
+				self._makeThisTextRangeEndWhereThatTextRangeStarts(tempRange, childRange)
 				if debug:
 					log.debug("Plain text before child")
 				for field in self._getTextWithFields_text(tempRange, formatConfig):
@@ -905,11 +909,7 @@ class UIATextInfo(textInfos.TextInfo):
 						"textRange started part way through child. "
 						"Cropping Start of child range to fit",
 					)
-				childRange.MoveEndpointByRange(
-					UIAHandler.TextPatternRangeEndpoint_Start,
-					tempRange,
-					UIAHandler.TextPatternRangeEndpoint_End,
-				)
+				self._makeThisTextRangeStartWhereThatTextRangeEnds(childRange, tempRange)
 				clippedStart = True
 			if (index == 0 or index == childElements.length - 1) and self._textRangeIsEmpty(childRange):
 				if debug:
@@ -928,20 +928,12 @@ class UIATextInfo(textInfos.TextInfo):
 				yield field
 			if debug:
 				log.debug(f"Done recursing into child {index}")
-			tempRange.MoveEndpointByRange(
-				UIAHandler.TextPatternRangeEndpoint_Start,
-				childRange,
-				UIAHandler.TextPatternRangeEndpoint_End,
-			)
+			self._makeThisTextRangeStartWhereThatTextRangeEnds(tempRange, childRange)
 		if debug:
 			log.debug("children done")
 		# Plain text after the final child
 		if self._thisTextRangeStartsBeforeThatTextRangeEnds(tempRange, textRange):
-			tempRange.MoveEndpointByRange(
-				UIAHandler.TextPatternRangeEndpoint_End,
-				textRange,
-				UIAHandler.TextPatternRangeEndpoint_End,
-			)
+			self._makeThisTextRangeEndWhereThatTextRangeEnds(tempRange, textRange)
 			if debug:
 				log.debug("Yielding final text")
 			for field in self._getTextWithFields_text(tempRange, formatConfig):
@@ -1123,17 +1115,9 @@ class UIATextInfo(textInfos.TextInfo):
 
 	def collapse(self, end: bool = False):
 		if end:
-			self._rangeObj.MoveEndpointByRange(
-				UIAHandler.TextPatternRangeEndpoint_Start,
-				self._rangeObj,
-				UIAHandler.TextPatternRangeEndpoint_End,
-			)
+			self._makeThisTextRangeStartWhereThatTextRangeEnds(self._rangeObj, self._rangeObj)
 		else:
-			self._rangeObj.MoveEndpointByRange(
-				UIAHandler.TextPatternRangeEndpoint_End,
-				self._rangeObj,
-				UIAHandler.TextPatternRangeEndpoint_Start,
-			)
+			self._makeThisTextRangeEndWhereThatTextRangeStarts(self._rangeObj, self._rangeObj)
 
 	def compareEndPoints(self, other: "UIATextInfo", which: str):
 		if which.startswith("start"):
@@ -1155,6 +1139,7 @@ class UIATextInfo(textInfos.TextInfo):
 			target = UIAHandler.TextPatternRangeEndpoint_Start
 		else:
 			target = UIAHandler.TextPatternRangeEndpoint_End
+		
 		self._rangeObj.MoveEndpointByRange(src, other._rangeObj, target)
 
 	def updateSelection(self):
