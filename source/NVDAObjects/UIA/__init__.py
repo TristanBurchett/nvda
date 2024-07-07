@@ -107,7 +107,7 @@ class _Range:
 			> 0
 		)
 
-	def _thisStartsBeforeThatEnds(this, that) -> bool:
+	def _thisStartsBeforeThatEnds(this: IUIAutomationTextRangeT, that: IUIAutomationTextRangeT) -> bool:
 		return (
 			this.CompareEndpoints(
 				UIAHandler.TextPatternRangeEndpoint_Start,
@@ -117,7 +117,7 @@ class _Range:
 			< 0
 		)
 
-	def _thisEndsBeforeThatStarts(this, that) -> bool:
+	def _thisEndsBeforeThatStarts(this: IUIAutomationTextRangeT, that: IUIAutomationTextRangeT) -> bool:
 		return (
 			this.CompareEndpoints(
 				UIAHandler.TextPatternRangeEndpoint_End,
@@ -127,7 +127,7 @@ class _Range:
 			<= 0
 		)
 
-	def _thisEndsBeforeThatEnds(this, that) -> bool:
+	def _thisEndsBeforeThatEnds(this: IUIAutomationTextRangeT, that: IUIAutomationTextRangeT) -> bool:
 		return (
 			this.CompareEndpoints(
 				UIAHandler.TextPatternRangeEndpoint_End,
@@ -137,35 +137,35 @@ class _Range:
 			< 0
 		)
 
-	def _makeThisStartWhereThatStarts(this, that):
+	def _makeThisStartWhereThatStarts(this: IUIAutomationTextRangeT, that: IUIAutomationTextRangeT) -> None:
 		this.MoveEndpointByRange(
 			UIAHandler.TextPatternRangeEndpoint_Start,
 			that,
 			UIAHandler.TextPatternRangeEndpoint_Start,
 		)
 
-	def _makeThisStartWhereThatEnds(this, that):
+	def _makeThisStartWhereThatEnds(this: IUIAutomationTextRangeT, that: IUIAutomationTextRangeT) -> None:
 		this.MoveEndpointByRange(
 			UIAHandler.TextPatternRangeEndpoint_Start,
 			that,
 			UIAHandler.TextPatternRangeEndpoint_End,
 		)
 
-	def _makeThisEndWhereThatStarts(this, that):
+	def _makeThisEndWhereThatStarts(this: IUIAutomationTextRangeT, that: IUIAutomationTextRangeT) -> None:
 		this.MoveEndpointByRange(
 			UIAHandler.TextPatternRangeEndpoint_End,
 			that,
 			UIAHandler.TextPatternRangeEndpoint_Start,
 		)
 
-	def _makeThisEndWhereThatEnds(this, that):
+	def _makeThisEndWhereThatEnds(this: IUIAutomationTextRangeT, that: IUIAutomationTextRangeT) -> None:
 		this.MoveEndpointByRange(
 			UIAHandler.TextPatternRangeEndpoint_End,
 			that,
 			UIAHandler.TextPatternRangeEndpoint_End,
 		)
 
-	def _collapse(range, end: bool = False):
+	def _collapse(range: IUIAutomationTextRangeT, end: bool = False) -> None:
 		if end:
 			_Range._makeThisStartWhereThatEnds(range, range)
 		else:
