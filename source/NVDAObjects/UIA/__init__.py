@@ -1147,7 +1147,6 @@ class UIATextInfo(textInfos.TextInfo):
 			target = UIAHandler.TextPatternRangeEndpoint_Start
 		else:
 			target = UIAHandler.TextPatternRangeEndpoint_End
-
 		self._rangeObj.MoveEndpointByRange(src, other._rangeObj, target)
 
 	def updateSelection(self):
