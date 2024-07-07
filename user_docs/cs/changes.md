@@ -194,6 +194,7 @@ Highlights of this release include support for Asian character input; experiment
 * The Elements list in Browse mode will now remember the last element type shown (e.g. links, headings or landmarks) each time the dialog is shown within the same session of NVDA. (#365)
 * Most Metro apps in Windows 8 (e.g. Mail, Calendar) no longer activate Browse Mode for the entire app.
 * Updated Handy Tech BrailleDriver COM-Server to 1.4.2.0.
+* Refactored code (made helper functions) for _getTextWithFieldsForUIARange in source/__init__.py to increase readibility
 
 ### Bug Fixes
 
@@ -1082,4 +1083,3 @@ K tomuto účelu byla vytvořena speciální verze výstupu Newfon pro NVDA. (#2
 * NVDA se nyní při změně jazyka v dialogu nastavení uživatelského rozhraní zeptá, zda má uložit nastavení a restartovat se. ABy se změna jazyka plně projevila, musí být NVDA restartován.
 * Pokud není možné při volbě hlasového výstupu v dialogu hlasové výstupy zvolený syntezátor načíst, NVDA na tuto skutečnost upozorní.
 * Při prvním načítání zvoleného syntezátoru nechá NVDA syntezátor, aby si sám zvolil nejvíce vyhovující hlas, tempo a výšku, místo, aby mu vnutil svá výchozí nastavení, která mu připadají v pořádku. Tím je odstraněn problém, kdy Sapi4 syntezátory eloquence a viavoice začínaly na to, že byly spouštěny poprvé, mluvit příliš rychle.
-
