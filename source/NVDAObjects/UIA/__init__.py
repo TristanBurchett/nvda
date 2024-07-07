@@ -154,17 +154,17 @@ class UIATextInfo(textInfos.TextInfo):
 		tempRange = self._rangeObj.clone()
 		documentRange = self.obj.UIATextPattern.documentRange
 		if reverse:
-			self._makeThisTextRangeStartWhereThatTextRangeStarts(tempRange, documentRange)
+			self._makeThisRangeStartWhereThatRangeStarts(tempRange, documentRange)
 		else:
 			if tempRange.move(UIAHandler.TextUnit_Character, 1) == 0:
 				return False
-			self._makeThisTextRangeEndWhereThatTextRangeEnds(tempRange, documentRange)
+			self._makeThisRangeEndWhereThatRangeEnds(tempRange, documentRange)
 		try:
 			range = tempRange.findText(text, reverse, not caseSensitive)
 		except COMError:
 			range = None
 		if range:
-			self._collapseTextRange(range, end=True)
+			self._collapseRange(range, end=True)
 			self._rangeObj = range
 			return True
 		return False
@@ -710,7 +710,7 @@ class UIATextInfo(textInfos.TextInfo):
 		if debug:
 			log.debug("Done _getTextWithFields_text")
 
-	def _textRangeIsEmpty(self, textRange) -> bool:
+	def _rangeIsEmpty(self, textRange) -> bool:
 		return (
 			textRange.CompareEndpoints(
 				UIAHandler.TextPatternRangeEndpoint_Start,
@@ -720,7 +720,7 @@ class UIATextInfo(textInfos.TextInfo):
 			== 0
 		)
 
-	def _thisTextRangeStartsAfterThatTextRangeStarts(self, thisRange, thatRange) -> bool:
+	def _thisRangeStartsAfterThatRangeStarts(self, thisRange, thatRange) -> bool:
 		return (
 			thisRange.CompareEndpoints(
 				UIAHandler.TextPatternRangeEndpoint_Start,
@@ -730,7 +730,7 @@ class UIATextInfo(textInfos.TextInfo):
 			> 0
 		)
 
-	def _thisTextRangeStartsBeforeThatTextRangeEnds(self, thisRange, thatRange) -> bool:
+	def _thisRangeStartsBeforeThatRangeEnds(self, thisRange, thatRange) -> bool:
 		return (
 			thisRange.CompareEndpoints(
 				UIAHandler.TextPatternRangeEndpoint_Start,
@@ -740,7 +740,7 @@ class UIATextInfo(textInfos.TextInfo):
 			< 0
 		)
 
-	def _thisTextRangeEndsBeforeThatTextRangeStarts(self, thisRange, thatRange) -> bool:
+	def _thisRangeEndsBeforeThatRangeStarts(self, thisRange, thatRange) -> bool:
 		return (
 			thisRange.CompareEndpoints(
 				UIAHandler.TextPatternRangeEndpoint_End,
@@ -750,7 +750,7 @@ class UIATextInfo(textInfos.TextInfo):
 			<= 0
 		)
 
-	def _thisTextRangeEndsBeforeThatTextRangeEnds(self, thisRange, thatRange) -> bool:
+	def _thisRangeEndsBeforeThatRangeEnds(self, thisRange, thatRange) -> bool:
 		return (
 			thisRange.CompareEndpoints(
 				UIAHandler.TextPatternRangeEndpoint_End,
@@ -760,39 +760,39 @@ class UIATextInfo(textInfos.TextInfo):
 			< 0
 		)
 
-	def _makeThisTextRangeStartWhereThatTextRangeStarts(self, thisRange, thatRange):
+	def _makeThisRangeStartWhereThatRangeStarts(self, thisRange, thatRange):
 		thisRange.MoveEndpointByRange(
 			UIAHandler.TextPatternRangeEndpoint_Start,
 			thatRange,
 			UIAHandler.TextPatternRangeEndpoint_Start,
 		)
 
-	def _makeThisTextRangeStartWhereThatTextRangeEnds(self, thisRange, thatRange):
+	def _makeThisRangeStartWhereThatRangeEnds(self, thisRange, thatRange):
 		thisRange.MoveEndpointByRange(
 			UIAHandler.TextPatternRangeEndpoint_Start,
 			thatRange,
 			UIAHandler.TextPatternRangeEndpoint_End,
 		)
 
-	def _makeThisTextRangeEndWhereThatTextRangeStarts(self, thisRange, thatRange):
+	def _makeThisRangeEndWhereThatRangeStarts(self, thisRange, thatRange):
 		thisRange.MoveEndpointByRange(
 			UIAHandler.TextPatternRangeEndpoint_End,
 			thatRange,
 			UIAHandler.TextPatternRangeEndpoint_Start,
 		)
 
-	def _makeThisTextRangeEndWhereThatTextRangeEnds(self, thisRange, thatRange):
+	def _makeThisRangeEndWhereThatRangeEnds(self, thisRange, thatRange):
 		thisRange.MoveEndpointByRange(
 			UIAHandler.TextPatternRangeEndpoint_End,
 			thatRange,
 			UIAHandler.TextPatternRangeEndpoint_End,
 		)
 
-	def _collapseTextRange(self, range, end: bool = False):
+	def _collapseRange(self, range, end: bool = False):
 		if end:
-			self._makeThisTextRangeStartWhereThatTextRangeEnds(range, range)
+			self._makeThisRangeStartWhereThatRangeEnds(range, range)
 		else:
-			self._makeThisTextRangeEndWhereThatTextRangeStarts(range, range)
+			self._makeThisRangeEndWhereThatRangeStarts(range, range)
 
 	def _walkAncestors(self, textRange, rootElement, _rootElementClipped, debug) -> List:
 		"""
@@ -829,8 +829,8 @@ class UIATextInfo(textInfos.TextInfo):
 					if debug:
 						log.debug("parentRange is NULL. Breaking")
 					break
-				clippedStart = self._thisTextRangeStartsAfterThatTextRangeStarts(textRange, parentRange)
-				clippedEnd = self._thisTextRangeEndsBeforeThatTextRangeEnds(textRange, parentRange)
+				clippedStart = self._thisRangeStartsAfterThatRangeStarts(textRange, parentRange)
+				clippedEnd = self._thisRangeEndsBeforeThatRangeEnds(textRange, parentRange)
 				parentElements.append((parentElement, (clippedStart, clippedEnd)))
 			parentElement = UIAHandler.handler.baseTreeWalker.getParentElementBuildCache(
 				parentElement,
@@ -852,7 +852,7 @@ class UIATextInfo(textInfos.TextInfo):
 		"""
 
 		tempRange = textRange.clone()
-		self._makeThisTextRangeEndWhereThatTextRangeStarts(tempRange, tempRange)
+		self._makeThisRangeEndWhereThatRangeStarts(tempRange, tempRange)
 		for index in range(childElements.length):
 			childElement = childElements.getElement(index)
 			if not childElement or UIAHandler.handler.clientObject.compareElements(
@@ -880,21 +880,21 @@ class UIATextInfo(textInfos.TextInfo):
 				if debug:
 					log.debug("NULL childRange. Skipping")
 				continue
-			if self._thisTextRangeEndsBeforeThatTextRangeStarts(childRange, textRange):
+			if self._thisRangeEndsBeforeThatRangeStarts(childRange, textRange):
 				if debug:
 					log.debug("Child completely before textRange. Skipping")
 				continue
-			if self._thisTextRangeEndsBeforeThatTextRangeStarts(textRange, childRange):
+			if self._thisRangeEndsBeforeThatRangeStarts(textRange, childRange):
 				if debug:
 					log.debug("Child at or past end of textRange. Breaking")
 				break
-			clippedEnd = self._thisTextRangeEndsBeforeThatTextRangeEnds(textRange, childRange)
+			clippedEnd = self._thisRangeEndsBeforeThatRangeEnds(textRange, childRange)
 			if clippedEnd:
 				if debug:
 					log.debug(
 						"textRange ended part way through the child. Cropping end of child range to fit",
 					)
-				self._makeThisTextRangeEndWhereThatTextRangeEnds(childRange, textRange)
+				self._makeThisRangeEndWhereThatRangeEnds(childRange, textRange)
 			clippedStart = False
 			childStartDelta = childRange.CompareEndpoints(
 				UIAHandler.TextPatternRangeEndpoint_Start,
@@ -903,7 +903,7 @@ class UIATextInfo(textInfos.TextInfo):
 			)
 			if childStartDelta > 0:
 				# plain text before this child
-				self._makeThisTextRangeEndWhereThatTextRangeStarts(tempRange, childRange)
+				self._makeThisRangeEndWhereThatRangeStarts(tempRange, childRange)
 				if debug:
 					log.debug("Plain text before child")
 				for field in self._getTextWithFields_text(tempRange, formatConfig):
@@ -913,9 +913,9 @@ class UIATextInfo(textInfos.TextInfo):
 					log.debug(
 						"textRange started part way through child. Cropping start of child range to fit",
 					)
-				self._makeThisTextRangeStartWhereThatTextRangeEnds(childRange, tempRange)
+				self._makeThisRangeStartWhereThatRangeEnds(childRange, tempRange)
 				clippedStart = True
-			if (index == 0 or index == childElements.length - 1) and self._textRangeIsEmpty(childRange):
+			if (index == 0 or index == childElements.length - 1) and self._rangeIsEmpty(childRange):
 				if debug:
 					log.debug("childRange is degenerate. Skipping")
 				continue
@@ -932,12 +932,12 @@ class UIATextInfo(textInfos.TextInfo):
 				yield field
 			if debug:
 				log.debug(f"Done recursing into child {index}")
-			self._makeThisTextRangeStartWhereThatTextRangeEnds(tempRange, childRange)
+			self._makeThisRangeStartWhereThatRangeEnds(tempRange, childRange)
 		if debug:
 			log.debug("children done")
 		# Plain text after the final child
-		if self._thisTextRangeStartsBeforeThatTextRangeEnds(tempRange, textRange):
-			self._makeThisTextRangeEndWhereThatTextRangeEnds(tempRange, textRange)
+		if self._thisRangeStartsBeforeThatRangeEnds(tempRange, textRange):
+			self._makeThisRangeEndWhereThatRangeEnds(tempRange, textRange)
 			if debug:
 				log.debug("Yielding final text")
 			for field in self._getTextWithFields_text(tempRange, formatConfig):
@@ -1125,7 +1125,7 @@ class UIATextInfo(textInfos.TextInfo):
 		return self.__class__(self.obj, None, _rangeObj=self._rangeObj)
 
 	def collapse(self, end: bool = False):
-		self._collapseTextRange(self._rangeObj, end=end)
+		self._collapseRange(self._rangeObj, end=end)
 
 	def compareEndPoints(self, other: "UIATextInfo", which: str):
 		if which.startswith("start"):
