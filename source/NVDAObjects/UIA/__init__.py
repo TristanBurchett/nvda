@@ -837,7 +837,7 @@ class UIATextInfo(textInfos.TextInfo):
 		enclosingElement, 
 		debug : bool)  -> Generator[textInfos.TextInfo.TextOrFieldsT, None, None]:
 		"""
-		Yields text for the given child elements.  Child text that not contained within the given textRange will be ignored.
+		Yields text for the given child elements.  Child text not contained within textRange will be ignored.
 		"""
 
 		tempRange = textRange.clone()
