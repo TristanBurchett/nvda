@@ -740,16 +740,6 @@ class UIATextInfo(textInfos.TextInfo):
 			< 0
 		)
 
-	def _thisTextRangeStartsAfterThatTextRangeEnds(self, thisRange, thatRange) -> bool:
-		return (
-			thisRange.CompareEndpoints(
-				UIAHandler.TextPatternRangeEndpoint_Start,
-				thatRange,
-				UIAHandler.TextPatternRangeEndpoint_End,
-			)
-			>= 0
-		)
-
 	def _thisTextRangeEndsBeforeThatTextRangeStarts(self, thisRange, thatRange) -> bool:
 		return (
 			thisRange.CompareEndpoints(
@@ -799,6 +789,14 @@ class UIATextInfo(textInfos.TextInfo):
 		)
 
 	def _walkAncestors(self, textRange, rootElement, _rootElementClipped, debug) -> List:
+		"""
+		Returns a list with one element per parent element, starting from textRange.
+		Each item in the list is of the form (parentElement, (clippedStart, clippedEnd)) where
+		clippedStart and clippedEnd are booleans indicating whether that parent's text needed
+		to be clipped in order to fit inside textRange.
+		@param textRange: the element from which to start traversing parents.
+		@param _rootElementClipped: used when adding the root element to the result.
+		"""
 		try:
 			parentElement = getEnclosingElementWithCacheFromUIATextRange(
 				textRange,
@@ -880,7 +878,7 @@ class UIATextInfo(textInfos.TextInfo):
 				if debug:
 					log.debug("Child completely before textRange. Skipping")
 				continue
-			if self._thisTextRangeStartsAfterThatTextRangeEnds(childRange, textRange):
+			if self._thisTextRangeEndsBeforeThatTextRangeStarts(textRange, childRange):
 				if debug:
 					log.debug("Child at or past end of textRange. Breaking")
 				break
@@ -951,23 +949,20 @@ class UIATextInfo(textInfos.TextInfo):
 		windowHandle = self.obj.windowHandle
 		controlFieldNVDAObjectClass = self.controlFieldNVDAObjectClass
 		parentFields = []
-		for index, (parentElement, parentClipped) in enumerate(parentElements):
+		for index, (parentElement, (clippedStart, clippedEnd)) in enumerate(parentElements):
 			if debug:
 				log.debug("parentElement: %s" % parentElement.currentLocalizedControlType)
-			startOfNode = not parentClipped[0]
-			endOfNode = not parentClipped[1]
 			try:
 				obj = controlFieldNVDAObjectClass(
 					windowHandle=windowHandle,
 					UIAElement=parentElement,
 					initialUIACachedPropertyIDs=self._controlFieldUIACachedPropertyIDs,
 				)
-				objIsEmbedded = firstChildIsEmbedded and index == 0
 				field = self._getControlFieldForUIAObject(
 					obj,
-					isEmbedded=objIsEmbedded,
-					startOfNode=startOfNode,
-					endOfNode=endOfNode,
+					isEmbedded=(firstChildIsEmbedded and index == 0),
+					startOfNode=not clippedStart,
+					endOfNode=not clippedEnd,
 				)
 			except LookupError:
 				if debug:
