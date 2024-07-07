@@ -722,66 +722,77 @@ class UIATextInfo(textInfos.TextInfo):
 		if debug:
 			log.debug("Done _getTextWithFields_text")
 	
-	def _walkAncestors(self, debug, textRange, rootElement, _rootElementClipped, parentElements):
+	def _walkAncestors(self, textRange, rootElement, _rootElementClipped, debug) -> List:
 		if debug:
-				log.debug("Fetching parents starting from enclosingElement")
+			log.debug("Fetching parents starting from enclosingElement")
+		try:
+			parentElement = getEnclosingElementWithCacheFromUIATextRange(
+				textRange,
+				self._controlFieldUIACacheRequest,
+			)
+		except COMError:
+			parentElement = None
+		parentElements = []
+		while parentElement:
+			isRoot = UIAHandler.handler.clientObject.compareElements(parentElement, rootElement)
+			if isRoot:
+				if debug:
+					log.debug("Hit root")
+				parentElements.append((parentElement, _rootElementClipped))
+				break
+			else:
+				if debug:
+					log.debug("parentElement: %s" % parentElement.currentLocalizedControlType)
 				try:
-					parentElement = getEnclosingElementWithCacheFromUIATextRange(
-						textRange,
-						self._controlFieldUIACacheRequest,
-					)
+					parentRange = self.obj.UIATextPattern.rangeFromChild(parentElement)
 				except COMError:
-					parentElement = None
-				while parentElement:
-					isRoot = UIAHandler.handler.clientObject.compareElements(parentElement, rootElement)
-					if isRoot:
-						if debug:
-							log.debug("Hit root")
-						parentElements.append((parentElement, _rootElementClipped))
-						break
-					else:
-						if debug:
-							log.debug("parentElement: %s" % parentElement.currentLocalizedControlType)
-						try:
-							parentRange = self.obj.UIATextPattern.rangeFromChild(parentElement)
-						except COMError:
-							parentRange = None
-						if not parentRange:
-							if debug:
-								log.debug("parentRange is NULL. Breaking")
-							break
-						clippedStart = (
-							textRange.CompareEndpoints(
-								UIAHandler.TextPatternRangeEndpoint_Start,
-								parentRange,
-								UIAHandler.TextPatternRangeEndpoint_Start,
-							)
-							> 0
-						)
-						clippedEnd = (
-							textRange.CompareEndpoints(
-								UIAHandler.TextPatternRangeEndpoint_End,
-								parentRange,
-								UIAHandler.TextPatternRangeEndpoint_End,
-							)
-							< 0
-						)
-						parentElements.append((parentElement, (clippedStart, clippedEnd)))
-					parentElement = UIAHandler.handler.baseTreeWalker.getParentElementBuildCache(
-						parentElement,
-						self._controlFieldUIACacheRequest,
+					parentRange = None
+				if not parentRange:
+					if debug:
+						log.debug("parentRange is NULL. Breaking")
+					break
+				clippedStart = (
+					textRange.CompareEndpoints(
+						UIAHandler.TextPatternRangeEndpoint_Start,
+						parentRange,
+						UIAHandler.TextPatternRangeEndpoint_Start,
 					)
+					> 0
+				)
+				clippedEnd = (
+					textRange.CompareEndpoints(
+						UIAHandler.TextPatternRangeEndpoint_End,
+						parentRange,
+						UIAHandler.TextPatternRangeEndpoint_End,
+					)
+					< 0
+				)
+				parentElements.append((parentElement, (clippedStart, clippedEnd)))
+			parentElement = UIAHandler.handler.baseTreeWalker.getParentElementBuildCache(
+				parentElement,
+				self._controlFieldUIACacheRequest,
+			)
+		return parentElements
 	
-	def _collectTextForChildren(self, debug, formatConfig, textRange, childCount, childElements, rootElement, enclosingElement):
+	def _getTextForChildren(
+		self,
+		textRange: IUIAutomationTextRangeT,
+		formatConfig: Dict,
+		rootElement: UIAHandler.IUIAutomationElement,
+		childElements,
+		enclosingElement, 
+		debug : bool)  -> Generator[textInfos.TextInfo.TextOrFieldsT, None, None]:
+		"""
+		Yields text for the given UI Automation text range children.
+		"""
+
 		tempRange = textRange.clone()
 		tempRange.MoveEndpointByRange(
 			UIAHandler.TextPatternRangeEndpoint_End,
 			tempRange,
 			UIAHandler.TextPatternRangeEndpoint_Start,
 		)
-		if debug:
-			log.debug("Child count: %s" % childElements.length)
-			log.debug("Walking children")
+		childCount = childElements.length
 		lastChildIndex = childCount - 1
 		lastChildEndDelta = 0
 		documentTextPattern = self.obj.UIATextPattern
@@ -796,7 +807,7 @@ class UIATextInfo(textInfos.TextInfo):
 					log.debug("NULL childElement. Skipping")
 				continue
 			if rootElementControlType == UIAHandler.UIA_DataItemControlTypeId:
-				# #9090: MS Word has a rare bug where  a child of a table cell's UIA textRange can be its containing page.
+				# #9090: MS Word has a rare bug where a child of a table cell's UIA textRange can be its containing page.
 				# At very least stop the infinite recursion.
 				childAutomationID = childElement.cachedAutomationId or ""
 				if childAutomationID.startswith("UIA_AutomationId_Word_Page_"):
@@ -929,7 +940,7 @@ class UIATextInfo(textInfos.TextInfo):
 				yield field
 
 	# C901 '_getTextWithFieldsForUIARange' is too complex
-	# Note: when working on getPropertiesBraille, look for opportunities to simplify
+	# Note: when working on _getTextWithFieldsForUIARange, look for opportunities to simplify
 	# and move logic out into smaller helper functions.
 	def _getTextWithFieldsForUIARange(  # noqa: C901
 		self,
@@ -971,11 +982,10 @@ class UIATextInfo(textInfos.TextInfo):
 				):
 					log.debug("Detected embedded child")
 					recurseChildren = False
-		parentElements = []
 		if alwaysWalkAncestors:
-			self._walkAncestors(debug, textRange, rootElement, _rootElementClipped, parentElements)
+			parentElements = self._walkAncestors(textRange, rootElement, _rootElementClipped, debug)
 		else:
-			parentElements.append((rootElement, _rootElementClipped))
+			parentElements = [(rootElement, _rootElementClipped)]
 		if debug:
 			log.debug("Done fetching parents")
 		enclosingElement = parentElements[0][0] if parentElements else rootElement
@@ -1022,10 +1032,12 @@ class UIATextInfo(textInfos.TextInfo):
 		if debug:
 			log.debug("Yielding balanced fields for textRange")
 		# Move through the text range, collecting text and recursing into children
-		#: This variable is used to   span lengths of plain text between child ranges as we iterate over getChildren
-		childCount = childElements.length if recurseChildren else 0
-		if childCount > 0:
-			self._collectTextForChildren(debug, formatConfig, textRange, childCount, childElements, rootElement, enclosingElement)
+		if recurseChildren and childElements.length > 0:
+			if debug:
+				log.debug("Child count: %s" % childElements.length)
+				log.debug("Walking children")
+			for field in self._getTextForChildren(textRange, formatConfig, rootElement, childElements, enclosingElement, debug):
+				yield field
 		else:  # no children
 			if debug:
 				log.debug("no children")
