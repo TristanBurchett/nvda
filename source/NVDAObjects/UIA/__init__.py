@@ -716,7 +716,8 @@ class UIATextInfo(textInfos.TextInfo):
 				UIAHandler.TextPatternRangeEndpoint_Start,
 				textRange,
 				UIAHandler.TextPatternRangeEndpoint_End,
-			) == 0
+			)
+			== 0
 		)
 
 	def _thisTextRangeStartsAfterThatTextRangeStarts(self, thisRange, thatRange) -> bool:
@@ -725,25 +726,28 @@ class UIATextInfo(textInfos.TextInfo):
 				UIAHandler.TextPatternRangeEndpoint_Start,
 				thatRange,
 				UIAHandler.TextPatternRangeEndpoint_Start,
-			) > 0
+			)
+			> 0
 		)
-		
+
 	def _thisTextRangeStartsBeforeThatTextRangeEnds(self, thisRange, thatRange) -> bool:
 		return (
 			thisRange.CompareEndpoints(
 				UIAHandler.TextPatternRangeEndpoint_Start,
 				thatRange,
 				UIAHandler.TextPatternRangeEndpoint_End,
-			) < 0
+			)
+			< 0
 		)
-	
+
 	def _thisTextRangeStartsAfterThatTextRangeEnds(self, thisRange, thatRange) -> bool:
 		return (
 			thisRange.CompareEndpoints(
 				UIAHandler.TextPatternRangeEndpoint_Start,
 				thatRange,
 				UIAHandler.TextPatternRangeEndpoint_End,
-			) >= 0
+			)
+			>= 0
 		)
 
 	def _thisTextRangeEndsBeforeThatTextRangeStarts(self, thisRange, thatRange) -> bool:
@@ -752,16 +756,18 @@ class UIATextInfo(textInfos.TextInfo):
 				UIAHandler.TextPatternRangeEndpoint_End,
 				thatRange,
 				UIAHandler.TextPatternRangeEndpoint_Start,
-			) <= 0
+			)
+			<= 0
 		)
 
-	def _thisTextRangeEndsBeforeThatTextRangeEnds(self, thisRange, thatRange) -> bool:	
+	def _thisTextRangeEndsBeforeThatTextRangeEnds(self, thisRange, thatRange) -> bool:
 		return (
 			thisRange.CompareEndpoints(
 				UIAHandler.TextPatternRangeEndpoint_End,
 				thatRange,
 				UIAHandler.TextPatternRangeEndpoint_End,
-			) < 0
+			)
+			< 0
 		)
 
 	def _makeThisTextRangeStartWhereThatTextRangeStarts(self, thisRange, thatRange):
@@ -769,14 +775,14 @@ class UIATextInfo(textInfos.TextInfo):
 			UIAHandler.TextPatternRangeEndpoint_Start,
 			thatRange,
 			UIAHandler.TextPatternRangeEndpoint_Start,
-		)	
+		)
 
 	def _makeThisTextRangeStartWhereThatTextRangeEnds(self, thisRange, thatRange):
 		thisRange.MoveEndpointByRange(
 			UIAHandler.TextPatternRangeEndpoint_Start,
 			thatRange,
 			UIAHandler.TextPatternRangeEndpoint_End,
-		)	
+		)
 
 	def _makeThisTextRangeEndWhereThatTextRangeStarts(self, thisRange, thatRange):
 		thisRange.MoveEndpointByRange(
@@ -827,15 +833,16 @@ class UIATextInfo(textInfos.TextInfo):
 				self._controlFieldUIACacheRequest,
 			)
 		return parentElements
-	
+
 	def _getTextFromChildren(
 		self,
 		textRange: IUIAutomationTextRangeT,
 		formatConfig: Dict,
 		rootElement: UIAHandler.IUIAutomationElement,
 		childElements,
-		enclosingElement, 
-		debug : bool)  -> Generator[textInfos.TextInfo.TextOrFieldsT, None, None]:
+		enclosingElement,
+		debug: bool,
+	) -> Generator[textInfos.TextInfo.TextOrFieldsT, None, None]:
 		"""
 		Yields text for the given child elements.  Child text not contained within textRange will be ignored.
 		"""
@@ -906,8 +913,7 @@ class UIATextInfo(textInfos.TextInfo):
 			elif childStartDelta < 0:
 				if debug:
 					log.debug(
-						"textRange started part way through child. "
-						"Cropping Start of child range to fit",
+						"textRange started part way through child. " "Cropping Start of child range to fit",
 					)
 				self._makeThisTextRangeStartWhereThatTextRangeEnds(childRange, tempRange)
 				clippedStart = True
@@ -938,6 +944,39 @@ class UIATextInfo(textInfos.TextInfo):
 				log.debug("Yielding final text")
 			for field in self._getTextWithFields_text(tempRange, formatConfig):
 				yield field
+
+	def _generateControlFieldsForParents(
+		self, parentElements: List, firstChildIsEmbedded: bool, debug: bool
+	) -> List[textInfos.ControlField]:
+		windowHandle = self.obj.windowHandle
+		controlFieldNVDAObjectClass = self.controlFieldNVDAObjectClass
+		parentFields = []
+		for index, (parentElement, parentClipped) in enumerate(parentElements):
+			if debug:
+				log.debug("parentElement: %s" % parentElement.currentLocalizedControlType)
+			startOfNode = not parentClipped[0]
+			endOfNode = not parentClipped[1]
+			try:
+				obj = controlFieldNVDAObjectClass(
+					windowHandle=windowHandle,
+					UIAElement=parentElement,
+					initialUIACachedPropertyIDs=self._controlFieldUIACachedPropertyIDs,
+				)
+				objIsEmbedded = firstChildIsEmbedded and index == 0
+				field = self._getControlFieldForUIAObject(
+					obj,
+					isEmbedded=objIsEmbedded,
+					startOfNode=startOfNode,
+					endOfNode=endOfNode,
+				)
+			except LookupError:
+				if debug:
+					log.debug("Failed to fetch controlField data for parentElement. Breaking")
+				continue
+			if not field:
+				continue
+			parentFields.append(field)
+		return parentFields
 
 	# C901 '_getTextWithFieldsForUIARange' is too complex
 	# Note: when working on _getTextWithFieldsForUIARange, look for opportunities to simplify
@@ -996,33 +1035,8 @@ class UIATextInfo(textInfos.TextInfo):
 		parentFields = []
 		if debug:
 			log.debug("Generating controlFields for parents")
-		windowHandle = self.obj.windowHandle
-		controlFieldNVDAObjectClass = self.controlFieldNVDAObjectClass
-		for index, (parentElement, parentClipped) in enumerate(parentElements):
-			if debug:
-				log.debug("parentElement: %s" % parentElement.currentLocalizedControlType)
-			startOfNode = not parentClipped[0]
-			endOfNode = not parentClipped[1]
-			try:
-				obj = controlFieldNVDAObjectClass(
-					windowHandle=windowHandle,
-					UIAElement=parentElement,
-					initialUIACachedPropertyIDs=self._controlFieldUIACachedPropertyIDs,
-				)
-				objIsEmbedded = index == 0 and not recurseChildren
-				field = self._getControlFieldForUIAObject(
-					obj,
-					isEmbedded=objIsEmbedded,
-					startOfNode=startOfNode,
-					endOfNode=endOfNode,
-				)
-			except LookupError:
-				if debug:
-					log.debug("Failed to fetch controlField data for parentElement. Breaking")
-				continue
-			if not field:
-				continue
-			parentFields.append(field)
+		firstChildIsEmbedded = not recurseChildren
+		parentFields = self._generateControlFieldsForParents(parentElements, firstChildIsEmbedded, debug)
 		if debug:
 			log.debug("Done generating controlFields for parents")
 			log.debug("Yielding control starts for parents")
@@ -1038,7 +1052,9 @@ class UIATextInfo(textInfos.TextInfo):
 			if debug:
 				log.debug("Child count: %s" % childElements.length)
 				log.debug("Walking children")
-			for field in self._getTextFromChildren(textRange, formatConfig, rootElement, childElements, enclosingElement, debug):
+			for field in self._getTextFromChildren(
+				textRange, formatConfig, rootElement, childElements, enclosingElement, debug
+			):
 				yield field
 		else:  # no children
 			if debug:
@@ -1139,7 +1155,7 @@ class UIATextInfo(textInfos.TextInfo):
 			target = UIAHandler.TextPatternRangeEndpoint_Start
 		else:
 			target = UIAHandler.TextPatternRangeEndpoint_End
-		
+
 		self._rangeObj.MoveEndpointByRange(src, other._rangeObj, target)
 
 	def updateSelection(self):
