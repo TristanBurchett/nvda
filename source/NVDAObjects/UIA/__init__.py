@@ -82,6 +82,98 @@ textAlignLabels = {
 }
 
 
+class _Range:
+	"""
+	Helper functions for working with IUIAutomationTextRangeT
+	"""
+
+	def _isEmpty(range: IUIAutomationTextRangeT) -> bool:
+		return (
+			range.CompareEndpoints(
+				UIAHandler.TextPatternRangeEndpoint_Start,
+				range,
+				UIAHandler.TextPatternRangeEndpoint_End,
+			)
+			== 0
+		)
+
+	def _thisStartsAfterThatStarts(
+		thisRange: IUIAutomationTextRangeT, thatRange: IUIAutomationTextRangeT
+	) -> bool:
+		return (
+			thisRange.CompareEndpoints(
+				UIAHandler.TextPatternRangeEndpoint_Start,
+				thatRange,
+				UIAHandler.TextPatternRangeEndpoint_Start,
+			)
+			> 0
+		)
+
+	def _thisStartsBeforeThatEnds(thisRange, thatRange) -> bool:
+		return (
+			thisRange.CompareEndpoints(
+				UIAHandler.TextPatternRangeEndpoint_Start,
+				thatRange,
+				UIAHandler.TextPatternRangeEndpoint_End,
+			)
+			< 0
+		)
+
+	def _thisEndsBeforeThatStarts(thisRange, thatRange) -> bool:
+		return (
+			thisRange.CompareEndpoints(
+				UIAHandler.TextPatternRangeEndpoint_End,
+				thatRange,
+				UIAHandler.TextPatternRangeEndpoint_Start,
+			)
+			<= 0
+		)
+
+	def _thisEndsBeforeThatEnds(thisRange, thatRange) -> bool:
+		return (
+			thisRange.CompareEndpoints(
+				UIAHandler.TextPatternRangeEndpoint_End,
+				thatRange,
+				UIAHandler.TextPatternRangeEndpoint_End,
+			)
+			< 0
+		)
+
+	def _makeThisStartWhereThatStarts(thisRange, thatRange):
+		thisRange.MoveEndpointByRange(
+			UIAHandler.TextPatternRangeEndpoint_Start,
+			thatRange,
+			UIAHandler.TextPatternRangeEndpoint_Start,
+		)
+
+	def _makeThisStartWhereThatEnds(thisRange, thatRange):
+		thisRange.MoveEndpointByRange(
+			UIAHandler.TextPatternRangeEndpoint_Start,
+			thatRange,
+			UIAHandler.TextPatternRangeEndpoint_End,
+		)
+
+	def _makeThisEndWhereThatStarts(thisRange, thatRange):
+		thisRange.MoveEndpointByRange(
+			UIAHandler.TextPatternRangeEndpoint_End,
+			thatRange,
+			UIAHandler.TextPatternRangeEndpoint_Start,
+		)
+
+	def _makeThisEndWhereThatEnds(thisRange, thatRange):
+		thisRange.MoveEndpointByRange(
+			UIAHandler.TextPatternRangeEndpoint_End,
+			thatRange,
+			UIAHandler.TextPatternRangeEndpoint_End,
+		)
+
+	def _collapse(range, end: bool = False):
+		if end:
+			_makeThisStartWhereThatEnds(range, range)
+		else:
+			_makeThisEndWhereThatStarts(range, range)
+
+
 class UIATextInfo(textInfos.TextInfo):
 	_rangeObj: IUIAutomationTextRangeT
 
@@ -154,11 +246,11 @@ class UIATextInfo(textInfos.TextInfo):
 		tempRange = self._rangeObj.clone()
 		documentRange = self.obj.UIATextPattern.documentRange
 		if reverse:
-			self._makeThisRangeStartWhereThatRangeStarts(tempRange, documentRange)
+			_makeThisStartWhereThatStarts(tempRange, documentRange)
 		else:
 			if tempRange.move(UIAHandler.TextUnit_Character, 1) == 0:
 				return False
-			self._makeThisRangeEndWhereThatRangeEnds(tempRange, documentRange)
+			_makeThisEndWhereThatEnds(tempRange, documentRange)
 		try:
 			range = tempRange.findText(text, reverse, not caseSensitive)
 		except COMError:
@@ -710,91 +802,7 @@ class UIATextInfo(textInfos.TextInfo):
 		if debug:
 			log.debug("Done _getTextWithFields_text")
 
-	def _rangeIsEmpty(self, textRange) -> bool:
-		return (
-			textRange.CompareEndpoints(
-				UIAHandler.TextPatternRangeEndpoint_Start,
-				textRange,
-				UIAHandler.TextPatternRangeEndpoint_End,
-			)
-			== 0
-		)
-
-	def _thisRangeStartsAfterThatRangeStarts(self, thisRange, thatRange) -> bool:
-		return (
-			thisRange.CompareEndpoints(
-				UIAHandler.TextPatternRangeEndpoint_Start,
-				thatRange,
-				UIAHandler.TextPatternRangeEndpoint_Start,
-			)
-			> 0
-		)
-
-	def _thisRangeStartsBeforeThatRangeEnds(self, thisRange, thatRange) -> bool:
-		return (
-			thisRange.CompareEndpoints(
-				UIAHandler.TextPatternRangeEndpoint_Start,
-				thatRange,
-				UIAHandler.TextPatternRangeEndpoint_End,
-			)
-			< 0
-		)
-
-	def _thisRangeEndsBeforeThatRangeStarts(self, thisRange, thatRange) -> bool:
-		return (
-			thisRange.CompareEndpoints(
-				UIAHandler.TextPatternRangeEndpoint_End,
-				thatRange,
-				UIAHandler.TextPatternRangeEndpoint_Start,
-			)
-			<= 0
-		)
-
-	def _thisRangeEndsBeforeThatRangeEnds(self, thisRange, thatRange) -> bool:
-		return (
-			thisRange.CompareEndpoints(
-				UIAHandler.TextPatternRangeEndpoint_End,
-				thatRange,
-				UIAHandler.TextPatternRangeEndpoint_End,
-			)
-			< 0
-		)
-
-	def _makeThisRangeStartWhereThatRangeStarts(self, thisRange, thatRange):
-		thisRange.MoveEndpointByRange(
-			UIAHandler.TextPatternRangeEndpoint_Start,
-			thatRange,
-			UIAHandler.TextPatternRangeEndpoint_Start,
-		)
-
-	def _makeThisRangeStartWhereThatRangeEnds(self, thisRange, thatRange):
-		thisRange.MoveEndpointByRange(
-			UIAHandler.TextPatternRangeEndpoint_Start,
-			thatRange,
-			UIAHandler.TextPatternRangeEndpoint_End,
-		)
-
-	def _makeThisRangeEndWhereThatRangeStarts(self, thisRange, thatRange):
-		thisRange.MoveEndpointByRange(
-			UIAHandler.TextPatternRangeEndpoint_End,
-			thatRange,
-			UIAHandler.TextPatternRangeEndpoint_Start,
-		)
-
-	def _makeThisRangeEndWhereThatRangeEnds(self, thisRange, thatRange):
-		thisRange.MoveEndpointByRange(
-			UIAHandler.TextPatternRangeEndpoint_End,
-			thatRange,
-			UIAHandler.TextPatternRangeEndpoint_End,
-		)
-
-	def _collapseRange(self, range, end: bool = False):
-		if end:
-			self._makeThisRangeStartWhereThatRangeEnds(range, range)
-		else:
-			self._makeThisRangeEndWhereThatRangeStarts(range, range)
-
-	def _walkAncestors(self, textRange, rootElement, _rootElementClipped, debug) -> List:
+	def _getParentElements(self, textRange, rootElement, _rootElementClipped, debug) -> List:
 		"""
 		Returns a list with one element per parent element, starting from textRange.
 		Each item in the list is of the form (parentElement, (clippedStart, clippedEnd)) where
@@ -829,8 +837,8 @@ class UIATextInfo(textInfos.TextInfo):
 					if debug:
 						log.debug("parentRange is NULL. Breaking")
 					break
-				clippedStart = self._thisRangeStartsAfterThatRangeStarts(textRange, parentRange)
-				clippedEnd = self._thisRangeEndsBeforeThatRangeEnds(textRange, parentRange)
+				clippedStart = _Range._thisStartsAfterThatStarts(textRange, parentRange)
+				clippedEnd = _Range._thisEndsBeforeThatEnds(textRange, parentRange)
 				parentElements.append((parentElement, (clippedStart, clippedEnd)))
 			parentElement = UIAHandler.handler.baseTreeWalker.getParentElementBuildCache(
 				parentElement,
@@ -850,9 +858,8 @@ class UIATextInfo(textInfos.TextInfo):
 		"""
 		Yields text for the given child elements.  Child text not contained within textRange will be ignored.
 		"""
-
 		tempRange = textRange.clone()
-		self._makeThisRangeEndWhereThatRangeStarts(tempRange, tempRange)
+		_Range._makeThisEndWhereThatStarts(tempRange, tempRange)
 		for index in range(childElements.length):
 			childElement = childElements.getElement(index)
 			if not childElement or UIAHandler.handler.clientObject.compareElements(
@@ -880,21 +887,21 @@ class UIATextInfo(textInfos.TextInfo):
 				if debug:
 					log.debug("NULL childRange. Skipping")
 				continue
-			if self._thisRangeEndsBeforeThatRangeStarts(childRange, textRange):
+			if _Range._thisEndsBeforeThatStarts(childRange, textRange):
 				if debug:
 					log.debug("Child completely before textRange. Skipping")
 				continue
-			if self._thisRangeEndsBeforeThatRangeStarts(textRange, childRange):
+			if _Range._thisEndsBeforeThatStarts(textRange, childRange):
 				if debug:
 					log.debug("Child at or past end of textRange. Breaking")
 				break
-			clippedEnd = self._thisRangeEndsBeforeThatRangeEnds(textRange, childRange)
+			clippedEnd = _Range._thisEndsBeforeThatEnds(textRange, childRange)
 			if clippedEnd:
 				if debug:
 					log.debug(
 						"textRange ended part way through the child. Cropping end of child range to fit",
 					)
-				self._makeThisRangeEndWhereThatRangeEnds(childRange, textRange)
+				_Range._makeThisEndWhereThatEnds(childRange, textRange)
 			clippedStart = False
 			childStartDelta = childRange.CompareEndpoints(
 				UIAHandler.TextPatternRangeEndpoint_Start,
@@ -903,7 +910,7 @@ class UIATextInfo(textInfos.TextInfo):
 			)
 			if childStartDelta > 0:
 				# plain text before this child
-				self._makeThisRangeEndWhereThatRangeStarts(tempRange, childRange)
+				_Range._makeThisEndWhereThatStarts(tempRange, childRange)
 				if debug:
 					log.debug("Plain text before child")
 				for field in self._getTextWithFields_text(tempRange, formatConfig):
@@ -913,9 +920,9 @@ class UIATextInfo(textInfos.TextInfo):
 					log.debug(
 						"textRange started part way through child. Cropping start of child range to fit",
 					)
-				self._makeThisRangeStartWhereThatRangeEnds(childRange, tempRange)
+				_Range._makeThisStartWhereThatEnds(childRange, tempRange)
 				clippedStart = True
-			if (index == 0 or index == childElements.length - 1) and self._rangeIsEmpty(childRange):
+			if (index == 0 or index == childElements.length - 1) and _Range._isEmpty(childRange):
 				if debug:
 					log.debug("childRange is degenerate. Skipping")
 				continue
@@ -932,12 +939,12 @@ class UIATextInfo(textInfos.TextInfo):
 				yield field
 			if debug:
 				log.debug(f"Done recursing into child {index}")
-			self._makeThisRangeStartWhereThatRangeEnds(tempRange, childRange)
+			_Range._makeThisStartWhereThatEnds(tempRange, childRange)
 		if debug:
 			log.debug("children done")
 		# Plain text after the final child
-		if self._thisRangeStartsBeforeThatRangeEnds(tempRange, textRange):
-			self._makeThisRangeEndWhereThatRangeEnds(tempRange, textRange)
+		if _Range._thisStartsBeforeThatEnds(tempRange, textRange):
+			_Range._makeThisEndWhereThatEnds(tempRange, textRange)
 			if debug:
 				log.debug("Yielding final text")
 			for field in self._getTextWithFields_text(tempRange, formatConfig):
@@ -1019,7 +1026,7 @@ class UIATextInfo(textInfos.TextInfo):
 		if alwaysWalkAncestors:
 			if debug:
 				log.debug("Fetching parents starting from enclosingElement")
-			parentElements = self._walkAncestors(textRange, rootElement, _rootElementClipped, debug)
+			parentElements = self._getParentElements(textRange, rootElement, _rootElementClipped, debug)
 		else:
 			parentElements = [(rootElement, _rootElementClipped)]
 		if debug:
