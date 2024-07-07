@@ -117,14 +117,14 @@ class _Range:
 			< 0
 		)
 
-	def _thisEndsBeforeThatStarts(this: IUIAutomationTextRangeT, that: IUIAutomationTextRangeT) -> bool:
+	def _thisStartsAfterThatEnds(this: IUIAutomationTextRangeT, that: IUIAutomationTextRangeT) -> bool:
 		return (
 			this.CompareEndpoints(
-				UIAHandler.TextPatternRangeEndpoint_End,
-				that,
 				UIAHandler.TextPatternRangeEndpoint_Start,
+				that,
+				UIAHandler.TextPatternRangeEndpoint_End,
 			)
-			<= 0
+			> 0
 		)
 
 	def _thisEndsBeforeThatEnds(this: IUIAutomationTextRangeT, that: IUIAutomationTextRangeT) -> bool:
@@ -885,13 +885,13 @@ class UIATextInfo(textInfos.TextInfo):
 				if debug:
 					log.debug("NULL childRange. Skipping")
 				continue
-			if _Range._thisEndsBeforeThatStarts(childRange, textRange):
+			if _Range._thisStartsAfterThatEnds(textRange, childRange):
 				if debug:
 					log.debug("Child completely before textRange. Skipping")
 				continue
-			if _Range._thisEndsBeforeThatStarts(textRange, childRange):
+			if _Range._thisStartsAfterThatEnds(childRange, textRange):
 				if debug:
-					log.debug("Child at or past end of textRange. Breaking")
+					log.debug("Child completely after textRange. Breaking")
 				break
 			clippedEnd = _Range._thisEndsBeforeThatEnds(textRange, childRange)
 			if clippedEnd:
