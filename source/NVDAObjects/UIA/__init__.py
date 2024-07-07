@@ -160,12 +160,12 @@ class UIATextInfo(textInfos.TextInfo):
 				return False
 			self._makeThisTextRangeEndWhereThatTextRangeEnds(tempRange, documentRange)
 		try:
-			r = tempRange.findText(text, reverse, not caseSensitive)
+			range = tempRange.findText(text, reverse, not caseSensitive)
 		except COMError:
-			r = None
-		if r:
-			self._makeThisTextRangeEndWhereThatTextRangeStarts(r, r)
-			self._rangeObj = r
+			range = None
+		if range:
+			self._collapseTextRange(range, end=True)
+			self._rangeObj = range
 			return True
 		return False
 
@@ -788,6 +788,12 @@ class UIATextInfo(textInfos.TextInfo):
 			UIAHandler.TextPatternRangeEndpoint_End,
 		)
 
+	def _collapseTextRange(self, range, end: bool = False):
+		if end:
+			self._makeThisTextRangeStartWhereThatTextRangeEnds(range, range)
+		else:
+			self._makeThisTextRangeEndWhereThatTextRangeStarts(range, range)
+
 	def _walkAncestors(self, textRange, rootElement, _rootElementClipped, debug) -> List:
 		"""
 		Returns a list with one element per parent element, starting from textRange.
@@ -1125,10 +1131,7 @@ class UIATextInfo(textInfos.TextInfo):
 		return self.__class__(self.obj, None, _rangeObj=self._rangeObj)
 
 	def collapse(self, end: bool = False):
-		if end:
-			self._makeThisTextRangeStartWhereThatTextRangeEnds(self._rangeObj, self._rangeObj)
-		else:
-			self._makeThisTextRangeEndWhereThatTextRangeStarts(self._rangeObj, self._rangeObj)
+		self._collapseTextRange(self._rangeObj, end=end)
 
 	def compareEndPoints(self, other: "UIATextInfo", which: str):
 		if which.startswith("start"):
