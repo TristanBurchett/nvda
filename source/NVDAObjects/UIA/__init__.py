@@ -721,10 +721,62 @@ class UIATextInfo(textInfos.TextInfo):
 				yield text
 		if debug:
 			log.debug("Done _getTextWithFields_text")
+
+	def _textRangeIsEmpty(self, textRange) -> bool:
+		return (
+			textRange.CompareEndpoints(
+				UIAHandler.TextPatternRangeEndpoint_Start,
+				textRange,
+				UIAHandler.TextPatternRangeEndpoint_End,
+			) == 0
+		)
+
+	def _thisTextRangeStartsAfterThatTextRangeStarts(self, thisRange, thatRange) -> bool:
+		return (
+			thisRange.CompareEndpoints(
+				UIAHandler.TextPatternRangeEndpoint_Start,
+				thatRange,
+				UIAHandler.TextPatternRangeEndpoint_Start,
+			) > 0
+		)
+		
+	def _thisTextRangeStartsBeforeThatTextRangeEnds(self, thisRange, thatRange) -> bool:
+		return (
+			thisRange.CompareEndpoints(
+				UIAHandler.TextPatternRangeEndpoint_Start,
+				thatRange,
+				UIAHandler.TextPatternRangeEndpoint_End,
+			) < 0
+		)
 	
+	def _thisTextRangeStartsAfterThatTextRangeEnds(self, thisRange, thatRange) -> bool:
+		return (
+			thisRange.CompareEndpoints(
+				UIAHandler.TextPatternRangeEndpoint_Start,
+				thatRange,
+				UIAHandler.TextPatternRangeEndpoint_End,
+			) >= 0
+		)
+
+	def _thisTextRangeEndsBeforeThatTextRangeStarts(self, thisRange, thatRange) -> bool:
+		return (
+			thisRange.CompareEndpoints(
+				UIAHandler.TextPatternRangeEndpoint_End,
+				thatRange,
+				UIAHandler.TextPatternRangeEndpoint_Start,
+			) <= 0
+		)
+
+	def _thisTextRangeEndsBeforeThatTextRangeEnds(self, thisRange, thatRange) -> bool:	
+		return (
+			thisRange.CompareEndpoints(
+				UIAHandler.TextPatternRangeEndpoint_End,
+				thatRange,
+				UIAHandler.TextPatternRangeEndpoint_End,
+			) < 0
+		)
+
 	def _walkAncestors(self, textRange, rootElement, _rootElementClipped, debug) -> List:
-		if debug:
-			log.debug("Fetching parents starting from enclosingElement")
 		try:
 			parentElement = getEnclosingElementWithCacheFromUIATextRange(
 				textRange,
@@ -751,22 +803,8 @@ class UIATextInfo(textInfos.TextInfo):
 					if debug:
 						log.debug("parentRange is NULL. Breaking")
 					break
-				clippedStart = (
-					textRange.CompareEndpoints(
-						UIAHandler.TextPatternRangeEndpoint_Start,
-						parentRange,
-						UIAHandler.TextPatternRangeEndpoint_Start,
-					)
-					> 0
-				)
-				clippedEnd = (
-					textRange.CompareEndpoints(
-						UIAHandler.TextPatternRangeEndpoint_End,
-						parentRange,
-						UIAHandler.TextPatternRangeEndpoint_End,
-					)
-					< 0
-				)
+				clippedStart = self._thisTextRangeStartsAfterThatTextRangeStarts(textRange, parentRange)
+				clippedEnd = self._thisTextRangeEndsBeforeThatTextRangeEnds(textRange, parentRange)
 				parentElements.append((parentElement, (clippedStart, clippedEnd)))
 			parentElement = UIAHandler.handler.baseTreeWalker.getParentElementBuildCache(
 				parentElement,
@@ -774,7 +812,7 @@ class UIATextInfo(textInfos.TextInfo):
 			)
 		return parentElements
 	
-	def _getTextForChildren(
+	def _getTextFromChildren(
 		self,
 		textRange: IUIAutomationTextRangeT,
 		formatConfig: Dict,
@@ -783,7 +821,7 @@ class UIATextInfo(textInfos.TextInfo):
 		enclosingElement, 
 		debug : bool)  -> Generator[textInfos.TextInfo.TextOrFieldsT, None, None]:
 		"""
-		Yields text for the given UI Automation text range children.
+		Yields text for the given child elements.  Child text that not contained within the given textRange will be ignored.
 		"""
 
 		tempRange = textRange.clone()
@@ -792,12 +830,7 @@ class UIATextInfo(textInfos.TextInfo):
 			tempRange,
 			UIAHandler.TextPatternRangeEndpoint_Start,
 		)
-		childCount = childElements.length
-		lastChildIndex = childCount - 1
-		lastChildEndDelta = 0
-		documentTextPattern = self.obj.UIATextPattern
-		rootElementControlType = rootElement.cachedControlType
-		for index in range(childCount):
+		for index in range(childElements.length):
 			childElement = childElements.getElement(index)
 			if not childElement or UIAHandler.handler.clientObject.compareElements(
 				childElement,
@@ -806,7 +839,7 @@ class UIATextInfo(textInfos.TextInfo):
 				if debug:
 					log.debug("NULL childElement. Skipping")
 				continue
-			if rootElementControlType == UIAHandler.UIA_DataItemControlTypeId:
+			if rootElement.cachedControlType == UIAHandler.UIA_DataItemControlTypeId:
 				# #9090: MS Word has a rare bug where a child of a table cell's UIA textRange can be its containing page.
 				# At very least stop the infinite recursion.
 				childAutomationID = childElement.cachedAutomationId or ""
@@ -815,7 +848,7 @@ class UIATextInfo(textInfos.TextInfo):
 			if debug:
 				log.debug("Fetched child %s (%s)" % (index, childElement.currentLocalizedControlType))
 			try:
-				childRange = documentTextPattern.rangeFromChild(childElement)
+				childRange = self.obj.UIATextPattern.rangeFromChild(childElement)
 			except COMError as e:
 				if debug:
 					log.debug(f"rangeFromChild failed with {e}")
@@ -824,30 +857,15 @@ class UIATextInfo(textInfos.TextInfo):
 				if debug:
 					log.debug("NULL childRange. Skipping")
 				continue
-			clippedStart = False
-			clippedEnd = False
-			if (
-				childRange.CompareEndpoints(
-					UIAHandler.TextPatternRangeEndpoint_End,
-					textRange,
-					UIAHandler.TextPatternRangeEndpoint_Start,
-				)
-				<= 0
-			):
+			if self._thisTextRangeEndsBeforeThatTextRangeStarts(childRange, textRange):
 				if debug:
 					log.debug("Child completely before textRange. Skipping")
 				continue
-			if (
-				childRange.CompareEndpoints(
-					UIAHandler.TextPatternRangeEndpoint_Start,
-					textRange,
-					UIAHandler.TextPatternRangeEndpoint_End,
-				)
-				>= 0
-			):
+			if self._thisTextRangeStartsAfterThatTextRangeEnds(childRange, textRange):
 				if debug:
 					log.debug("Child at or past end of textRange. Breaking")
 				break
+			clippedEnd = False
 			lastChildEndDelta = childRange.CompareEndpoints(
 				UIAHandler.TextPatternRangeEndpoint_End,
 				textRange,
@@ -856,7 +874,7 @@ class UIATextInfo(textInfos.TextInfo):
 			if lastChildEndDelta > 0:
 				if debug:
 					log.debug(
-						"textRange ended part way through the child. " "Crop end of childRange to fit",
+						"textRange ended part way through the child. Crop end of childRange to fit",
 					)
 				childRange.MoveEndpointByRange(
 					UIAHandler.TextPatternRangeEndpoint_End,
@@ -864,6 +882,7 @@ class UIATextInfo(textInfos.TextInfo):
 					UIAHandler.TextPatternRangeEndpoint_End,
 				)
 				clippedEnd = True
+			clippedStart = False
 			childStartDelta = childRange.CompareEndpoints(
 				UIAHandler.TextPatternRangeEndpoint_Start,
 				tempRange,
@@ -892,11 +911,7 @@ class UIATextInfo(textInfos.TextInfo):
 					UIAHandler.TextPatternRangeEndpoint_End,
 				)
 				clippedStart = True
-			if (index == 0 or index == lastChildIndex) and childRange.CompareEndpoints(
-				UIAHandler.TextPatternRangeEndpoint_Start,
-				childRange,
-				UIAHandler.TextPatternRangeEndpoint_End,
-			) == 0:
+			if (index == 0 or index == childElements.length - 1) and self._textRangeIsEmpty(childRange):
 				if debug:
 					log.debug("childRange is degenerate. Skipping")
 				continue
@@ -921,14 +936,7 @@ class UIATextInfo(textInfos.TextInfo):
 		if debug:
 			log.debug("children done")
 		# Plain text after the final child
-		if (
-			tempRange.CompareEndpoints(
-				UIAHandler.TextPatternRangeEndpoint_Start,
-				textRange,
-				UIAHandler.TextPatternRangeEndpoint_End,
-			)
-			< 0
-		):
+		if self._thisTextRangeStartsBeforeThatTextRangeEnds(tempRange, textRange):
 			tempRange.MoveEndpointByRange(
 				UIAHandler.TextPatternRangeEndpoint_End,
 				textRange,
@@ -983,6 +991,8 @@ class UIATextInfo(textInfos.TextInfo):
 					log.debug("Detected embedded child")
 					recurseChildren = False
 		if alwaysWalkAncestors:
+			if debug:
+				log.debug("Fetching parents starting from enclosingElement")
 			parentElements = self._walkAncestors(textRange, rootElement, _rootElementClipped, debug)
 		else:
 			parentElements = [(rootElement, _rootElementClipped)]
@@ -1036,7 +1046,7 @@ class UIATextInfo(textInfos.TextInfo):
 			if debug:
 				log.debug("Child count: %s" % childElements.length)
 				log.debug("Walking children")
-			for field in self._getTextForChildren(textRange, formatConfig, rootElement, childElements, enclosingElement, debug):
+			for field in self._getTextFromChildren(textRange, formatConfig, rootElement, childElements, enclosingElement, debug):
 				yield field
 		else:  # no children
 			if debug:
