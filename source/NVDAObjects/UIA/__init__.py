@@ -948,7 +948,7 @@ class UIATextInfo(textInfos.TextInfo):
 			for field in self._getTextWithFields_text(tempRange, formatConfig):
 				yield field
 
-	def _generateControlFieldsForParents(
+	def _getControlFieldsForParents(
 		self, parentElements: List, firstChildIsEmbedded: bool, debug: bool
 	) -> List[textInfos.ControlField]:
 		windowHandle = self.obj.windowHandle
@@ -1036,7 +1036,7 @@ class UIATextInfo(textInfos.TextInfo):
 		if debug:
 			log.debug("Generating controlFields for parents")
 		firstChildIsEmbedded = not recurseChildren
-		parentFields = self._generateControlFieldsForParents(parentElements, firstChildIsEmbedded, debug)
+		parentFields = self._getControlFieldsForParents(parentElements, firstChildIsEmbedded, debug)
 		if debug:
 			log.debug("Done generating controlFields for parents")
 			log.debug("Yielding control starts for parents")
