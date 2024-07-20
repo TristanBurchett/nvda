@@ -82,60 +82,50 @@ textAlignLabels = {
 }
 
 
-class _Range:
+class _RangeHelper:
 	"""
 	Helper functions for working with IUIAutomationTextRangeT
 	"""
 
 	def _isEmpty(range: IUIAutomationTextRangeT) -> bool:
-		return (
-			range.CompareEndpoints(
-				UIAHandler.TextPatternRangeEndpoint_Start,
-				range,
-				UIAHandler.TextPatternRangeEndpoint_End,
-			)
-			== 0
+		val = range.CompareEndpoints(
+			UIAHandler.TextPatternRangeEndpoint_Start,
+			range,
+			UIAHandler.TextPatternRangeEndpoint_End,
 		)
+		return val == 0
 
 	def _thisStartsAfterThatStarts(this: IUIAutomationTextRangeT, that: IUIAutomationTextRangeT) -> bool:
-		return (
-			this.CompareEndpoints(
-				UIAHandler.TextPatternRangeEndpoint_Start,
-				that,
-				UIAHandler.TextPatternRangeEndpoint_Start,
-			)
-			> 0
+		val = this.CompareEndpoints(
+			UIAHandler.TextPatternRangeEndpoint_Start,
+			that,
+			UIAHandler.TextPatternRangeEndpoint_Start,
 		)
+		return val > 0
 
 	def _thisStartsBeforeThatEnds(this: IUIAutomationTextRangeT, that: IUIAutomationTextRangeT) -> bool:
-		return (
-			this.CompareEndpoints(
-				UIAHandler.TextPatternRangeEndpoint_Start,
-				that,
-				UIAHandler.TextPatternRangeEndpoint_End,
-			)
-			< 0
+		val = this.CompareEndpoints(
+			UIAHandler.TextPatternRangeEndpoint_Start,
+			that,
+			UIAHandler.TextPatternRangeEndpoint_End,
 		)
+		return val < 0
 
 	def _thisStartsAfterThatEnds(this: IUIAutomationTextRangeT, that: IUIAutomationTextRangeT) -> bool:
-		return (
-			this.CompareEndpoints(
-				UIAHandler.TextPatternRangeEndpoint_Start,
-				that,
-				UIAHandler.TextPatternRangeEndpoint_End,
-			)
-			> 0
+		val = this.CompareEndpoints(
+			UIAHandler.TextPatternRangeEndpoint_Start,
+			that,
+			UIAHandler.TextPatternRangeEndpoint_End,
 		)
+		return val > 0
 
 	def _thisEndsBeforeThatEnds(this: IUIAutomationTextRangeT, that: IUIAutomationTextRangeT) -> bool:
-		return (
-			this.CompareEndpoints(
-				UIAHandler.TextPatternRangeEndpoint_End,
-				that,
-				UIAHandler.TextPatternRangeEndpoint_End,
-			)
-			< 0
+		val = this.CompareEndpoints(
+			UIAHandler.TextPatternRangeEndpoint_End,
+			that,
+			UIAHandler.TextPatternRangeEndpoint_End,
 		)
+		return val < 0
 
 	def _makeThisStartWhereThatStarts(this: IUIAutomationTextRangeT, that: IUIAutomationTextRangeT) -> None:
 		this.MoveEndpointByRange(
@@ -167,9 +157,9 @@ class _Range:
 
 	def _collapse(range: IUIAutomationTextRangeT, end: bool = False) -> None:
 		if end:
-			_Range._makeThisStartWhereThatEnds(range, range)
+			_RangeHelper._makeThisStartWhereThatEnds(range, range)
 		else:
-			_Range._makeThisEndWhereThatStarts(range, range)
+			_RangeHelper._makeThisEndWhereThatStarts(range, range)
 
 
 class UIATextInfo(textInfos.TextInfo):
@@ -244,11 +234,11 @@ class UIATextInfo(textInfos.TextInfo):
 		tempRange = self._rangeObj.clone()
 		documentRange = self.obj.UIATextPattern.documentRange
 		if reverse:
-			_Range._makeThisStartWhereThatStarts(tempRange, documentRange)
+			_RangeHelper._makeThisStartWhereThatStarts(tempRange, documentRange)
 		else:
 			if tempRange.move(UIAHandler.TextUnit_Character, 1) == 0:
 				return False
-			_Range._makeThisEndWhereThatEnds(tempRange, documentRange)
+			_RangeHelper._makeThisEndWhereThatEnds(tempRange, documentRange)
 		try:
 			range = tempRange.findText(text, reverse, not caseSensitive)
 		except COMError:
@@ -835,8 +825,8 @@ class UIATextInfo(textInfos.TextInfo):
 					if debug:
 						log.debug("parentRange is NULL. Breaking")
 					break
-				clippedStart = _Range._thisStartsAfterThatStarts(textRange, parentRange)
-				clippedEnd = _Range._thisEndsBeforeThatEnds(textRange, parentRange)
+				clippedStart = _RangeHelper._thisStartsAfterThatStarts(textRange, parentRange)
+				clippedEnd = _RangeHelper._thisEndsBeforeThatEnds(textRange, parentRange)
 				parentElements.append((parentElement, (clippedStart, clippedEnd)))
 			parentElement = UIAHandler.handler.baseTreeWalker.getParentElementBuildCache(
 				parentElement,
@@ -844,6 +834,9 @@ class UIATextInfo(textInfos.TextInfo):
 			)
 		return parentElements
 
+	# C901 '_getTextFromChildren' is too complex
+	# Note: when working on _getTextFromChildren, look for opportunities to simplify
+	# and move logic out into smaller helper functions.
 	def _getTextFromChildren(
 		self,
 		textRange: IUIAutomationTextRangeT,
@@ -857,7 +850,7 @@ class UIATextInfo(textInfos.TextInfo):
 		Yields text for the given child elements.  Child text not contained within textRange will be ignored.
 		"""
 		tempRange = textRange.clone()
-		_Range._makeThisEndWhereThatStarts(tempRange, tempRange)
+		_RangeHelper._collapse(tempRange, tempRange)
 		for index in range(childElements.length):
 			childElement = childElements.getElement(index)
 			if not childElement or UIAHandler.handler.clientObject.compareElements(
@@ -885,21 +878,21 @@ class UIATextInfo(textInfos.TextInfo):
 				if debug:
 					log.debug("NULL childRange. Skipping")
 				continue
-			if _Range._thisStartsAfterThatEnds(textRange, childRange):
+			if _RangeHelper._thisStartsAfterThatEnds(textRange, childRange):
 				if debug:
 					log.debug("Child completely before textRange. Skipping")
 				continue
-			if _Range._thisStartsAfterThatEnds(childRange, textRange):
+			if _RangeHelper._thisStartsAfterThatEnds(childRange, textRange):
 				if debug:
 					log.debug("Child completely after textRange. Breaking")
 				break
-			clippedEnd = _Range._thisEndsBeforeThatEnds(textRange, childRange)
+			clippedEnd = _RangeHelper._thisEndsBeforeThatEnds(textRange, childRange)
 			if clippedEnd:
 				if debug:
 					log.debug(
 						"textRange ended part way through the child. Cropping end of child range to fit",
 					)
-				_Range._makeThisEndWhereThatEnds(childRange, textRange)
+				_RangeHelper._makeThisEndWhereThatEnds(childRange, textRange)
 			clippedStart = False
 			childStartDelta = childRange.CompareEndpoints(
 				UIAHandler.TextPatternRangeEndpoint_Start,
@@ -908,7 +901,7 @@ class UIATextInfo(textInfos.TextInfo):
 			)
 			if childStartDelta > 0:
 				# plain text before this child
-				_Range._makeThisEndWhereThatStarts(tempRange, childRange)
+				_RangeHelper._makeThisEndWhereThatStarts(tempRange, childRange)
 				if debug:
 					log.debug("Plain text before child")
 				for field in self._getTextWithFields_text(tempRange, formatConfig):
@@ -918,9 +911,9 @@ class UIATextInfo(textInfos.TextInfo):
 					log.debug(
 						"textRange started part way through child. Cropping start of child range to fit",
 					)
-				_Range._makeThisStartWhereThatEnds(childRange, tempRange)
+				_RangeHelper._makeThisStartWhereThatEnds(childRange, tempRange)
 				clippedStart = True
-			if (index == 0 or index == childElements.length - 1) and _Range._isEmpty(childRange):
+			if (index == 0 or index == childElements.length - 1) and _RangeHelper._isEmpty(childRange):
 				if debug:
 					log.debug("childRange is degenerate. Skipping")
 				continue
@@ -937,12 +930,12 @@ class UIATextInfo(textInfos.TextInfo):
 				yield field
 			if debug:
 				log.debug(f"Done recursing into child {index}")
-			_Range._makeThisStartWhereThatEnds(tempRange, childRange)
+			_RangeHelper._makeThisStartWhereThatEnds(tempRange, childRange)
 		if debug:
 			log.debug("children done")
 		# Plain text after the final child
-		if _Range._thisStartsBeforeThatEnds(tempRange, textRange):
-			_Range._makeThisEndWhereThatEnds(tempRange, textRange)
+		if _RangeHelper._thisStartsBeforeThatEnds(tempRange, textRange):
+			_RangeHelper._makeThisEndWhereThatEnds(tempRange, textRange)
 			if debug:
 				log.debug("Yielding final text")
 			for field in self._getTextWithFields_text(tempRange, formatConfig):
